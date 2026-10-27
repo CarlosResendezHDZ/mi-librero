@@ -1,0 +1,86 @@
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta
+      name="description"
+      content="Registra los libros que lees por ISBN"
+    />
+    <meta name="theme-color" content="#5b3a29" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Mi Librero</title>
+
+    <style>
+      /* CSS crítico del pre-shell */
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #f8f5f2;
+      }
+
+      .pre {
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .pre header {
+        height: 56px;
+        padding: 0 16px;
+        display: flex;
+        align-items: center;
+        background: #5b3a29;
+        color: #fff;
+        font-weight: 700;
+      }
+
+      .pre main {
+        flex: 1;
+        display: grid;
+        place-items: center;
+      }
+
+      .pre .giro {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: 4px solid #e5d9cf;
+        border-top-color: #5b3a29;
+        animation: g 0.8s linear infinite;
+      }
+
+      .pre nav {
+        height: 64px;
+        background: #fff;
+        border-top: 1px solid #e5d9cf;
+      }
+
+      @keyframes g {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="root">
+      <!-- Pre-shell: React lo reemplaza al iniciar -->
+      <div class="pre">
+        <header>Mi Librero</header>
+        <main>
+          <div class="giro"></div>
+        </main>
+        <nav></nav>
+      </div>
+    </div>
+
+    <noscript>Mi Librero necesita JavaScript.</noscript>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

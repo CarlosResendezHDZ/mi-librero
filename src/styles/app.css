@@ -1,0 +1,65 @@
+
+/* Tema de Mi Librero */
+:root {
+  --librero: #5b3a29;
+  --alto-nav: 64px;
+  --bs-link-color: #5b3a29;
+  --bs-link-color-rgb: 91, 58, 41;
+}
+
+body {
+  background: #f8f5f2;
+}
+
+/* Contenido principal */
+.app-main {
+  max-width: 720px;
+  padding-bottom: calc(var(--alto-nav) + 1rem) !important;
+}
+
+/* Navegación inferior */
+.bottom-nav {
+  height: var(--alto-nav);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.bottom-nav__link {
+  color: #6c757d;
+  padding: 6px 0;
+  line-height: 1.1;
+}
+
+.bottom-nav__link.active {
+  color: var(--librero);
+  font-weight: 600;
+}
+
+/* Botones y colores */
+.bg-librero {
+  background-color: var(--librero) !important;
+}
+
+.btn-librero {
+  --bs-btn-bg: var(--librero);
+  --bs-btn-border-color: var(--librero);
+  --bs-btn-color: #fff;
+  --bs-btn-hover-bg: #47291b;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-disabled-bg: var(--librero);
+}
+
+.btn-outline-librero {
+  --bs-btn-color: var(--librero);
+  --bs-btn-border-color: var(--librero);
+  --bs-btn-hover-bg: var(--librero);
+  --bs-btn-hover-color: #fff;
+}
+
+/* Tamaños de los skeletons */
+.bloque {
+  height: 72px;
+}
+
+.portada-skeleton {
+  min-height: 150px;
+}
