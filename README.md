@@ -1,120 +1,88 @@
+# FindIt — Objetos perdidos y encontrados
 
-# Mi Librero
+## Descripción del proyecto
 
-Mi Librero es una aplicación web desarrollada con React y Vite que permite buscar información de libros mediante su código ISBN.
+FindIt es una aplicación web progresiva (PWA) desarrollada para facilitar la publicación y búsqueda de objetos perdidos y encontrados dentro de una comunidad.
 
-El proyecto utiliza la API de Open Library para obtener datos como el título, autor, editorial y portada.
-
-## Objetivo
-
-Desarrollar un App Shell que mantenga una estructura de navegación estable, muestre estados de carga y permita detectar cuando el dispositivo pierde conexión a internet.
+La aplicación permite consultar publicaciones, buscar objetos, aplicar filtros y guardar favoritos. Su diseño está adaptado para celulares y computadoras.
 
 ## Tecnologías utilizadas
 
-- React
-- Vite
+- React y Vite
 - React Router
-- Bootstrap y Bootstrap Icons
-- Open Library API
+- CSS y Lucide React
+- vite-plugin-pwa y Workbox
 - Firebase Hosting
 - GitHub Actions
 
 ## Funcionalidades
 
-- Navegación entre Biblioteca, Agregar y Reseñas.
-- Búsqueda de libros mediante ISBN.
-- Consulta de información y portadas.
-- Indicador de conexión a internet.
-- Aviso cuando no hay conexión.
-- Animaciones de carga (skeletons).
-- Pantallas de error y página 404.
+- Inicio de sesión de demostración.
+- Publicación de objetos perdidos y encontrados.
+- Búsqueda por nombre, categoría y lugar.
+- Filtros por tipo, fecha, categoría y ubicación.
+- Consulta de detalles de publicaciones.
+- Favoritos y administración de publicaciones.
+- Detección del estado de conexión.
+- Instalación como aplicación PWA.
+- Carga de recursos esenciales sin conexión.
+
+Los datos de las publicaciones se guardan actualmente mediante localStorage en cada navegador. Todavía no existe una base de datos compartida ni autenticación real.
 
 ## Tabla de definición del App Shell
 
-| Área | Elemento | Componente | Sin conexión | Semana |
-|---|---|---|---|---|
-| Pre-shell | Encabezado y animación de carga | index.html | Necesita cargar la página; el caché sin conexión llegará después | 1 |
-| Header | Nombre e indicador de red | AppHeader, NetworkBadge | Indica "Sin conexión" | 1 |
-| Navegación | Biblioteca, Agregar y Reseñas | BottomNav | Las vistas ya cargadas pueden seguir funcionando | 1 |
-| Contenido | Pantallas de la aplicación | AppLayout, Outlet, vistas | Las vistas no descargadas pueden fallar | 1 |
-| Estados de carga | Animaciones de espera | ViewSkeleton, BookSkeleton | Se muestran durante las cargas | 1 |
-| Errores y 404 | Mensajes de error | ViewErrorBoundary, NoEncontrado | Permite mostrar errores sin perder el shell | 1 |
-| Feedback global | Aviso de conexión | OfflineBanner | Muestra una advertencia | 1 |
-| Acción global | Instalación de la aplicación | InstallButton (pendiente) | Se implementará posteriormente | 2 |
+| Área | Elemento de FindIt | Implementación | Sin conexión |
+|---|---|---|---|
+| Pre-shell | Pantalla inicial de carga | index.html | Puede mostrarse desde caché |
+| Encabezado | Marca FindIt y estado de conexión | Frame | Indica falta de conexión |
+| Navegación | Inicio, Buscar, Publicar, Guardados y Perfil | Frame | Permite acceder a vistas cargadas |
+| Contenido | Pantallas de publicaciones y búsqueda | React Router | Utiliza información local |
+| Estados vacíos | Mensajes cuando no hay publicaciones | Componentes de FindIt | Siguen disponibles |
+| Feedback global | Aviso de conexión | Frame | Muestra advertencia |
+| Almacenamiento | Publicaciones y favoritos | localStorage | Conserva los datos del navegador |
+| PWA | Manifiesto y Service Worker | vite-plugin-pwa | Carga recursos almacenados |
 
-## Wireframe del App Shell
+## Wireframe
 
-El siguiente esquema representa la estructura principal de Mi Librero.
+El diseño principal de FindIt está organizado en tres áreas:
 
-```text
-+--------------------------------------+
-|             MI LIBRERO               |
-|                    [En línea]        |
-+--------------------------------------+
-|                                      |
-|       Aviso de conexión              |
-|       (cuando sea necesario)         |
-|                                      |
-+--------------------------------------+
-|                                      |
-|           CONTENIDO                  |
-|                                      |
-|       Mi biblioteca                  |
-|                                      |
-|       Aún no tienes libros           |
-|                                      |
-|         [Agregar libro]              |
-|                                      |
-|                                      |
-+--------------------------------------+
-|                                      |
-|  Biblioteca    Agregar    Reseñas     |
-|                                      |
-+--------------------------------------+
-```
+**Encabezado:** marca FindIt, nombre de la sección y estado de conexión.
 
-El encabezado y la navegación inferior pertenecen al App Shell porque se mantienen en todas las pantallas.
+**Contenido central:** buscador, filtros, tarjetas de objetos, formularios y detalles de publicaciones.
 
-El contenido central cambia dependiendo de la sección seleccionada.
+**Navegación inferior:** Inicio, Buscar, Publicar, Guardados y Perfil.
+
+El encabezado y la navegación se mantienen mientras cambia el contenido de las secciones.
 
 ## Pruebas realizadas
 
-- Ejecución local con Vite.
-- Revisión del código con ESLint.
-- Compilación de producción.
-- Prueba de navegación entre pantallas.
-- Prueba HTTPS desde un celular.
-- Publicación en Firebase Hosting.
-- Ejecución correcta de GitHub Actions.
+- Compilación correcta con npm run build.
+- Revisión del código con npm run lint.
+- Funcionamiento de las rutas y formularios.
+- Generación del manifiesto PWA.
+- Registro y activación del Service Worker.
+- Prueba básica de funcionamiento sin conexión.
+- Despliegue de vista previa mediante GitHub Actions.
 
 ## Ejecutar el proyecto
 
-Instalar dependencias:
+1. Instalar las dependencias: `npm install`
+2. Iniciar el servidor local: `npm run dev`
+3. Compilar la aplicación: `npm run build`
+4. Probar la versión compilada: `npm run preview`
 
-```bash
-npm install
-```
+## Trabajo colaborativo
 
-Iniciar el servidor:
+Los integrantes trabajan mediante ramas independientes en GitHub. Cada cambio se propone utilizando un Pull Request, que activa GitHub Actions para generar una vista previa en Firebase.
 
-```bash
-npm run dev
-```
-
-Generar la versión de producción:
-
-```bash
-npm run build
-```
+Al integrar los cambios en la rama main, se actualiza automáticamente la versión pública.
 
 ## Enlaces
 
-**Aplicación publicada:**
-https://mi-librero-85180.web.app
+Repositorio: https://github.com/CarlosResendezHDZ/mi-librero
 
-**Repositorio de GitHub:**
-https://github.com/CarlosResendezHDZ/mi-librero
+Aplicación pública: https://mi-librero-85180.web.app
 
-## Próximas funcionalidades
+## Próximas mejoras
 
-En las siguientes etapas se implementarán funciones como el almacenamiento local de libros, reseñas, funcionamiento sin conexión mediante un service worker, instalación de la aplicación y escaneo de códigos de barras.
+Se planea integrar una base de datos compartida, autenticación real y mejoras en la sincronización de información entre usuarios.
