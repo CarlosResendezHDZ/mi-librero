@@ -6,12 +6,16 @@ export default function AppHeader() {
   return (
     <header className="navbar navbar-dark bg-librero sticky-top">
       <div className="container">
-        <Link to="/" className="navbar-brand fw-bold">
+        <Link
+          to="/inicio"
+          className="navbar-brand fw-bold d-flex align-items-center"
+        >
           <i
-            className="bi bi-book-half me-2"
+            className="bi bi-search me-2"
             aria-hidden="true"
           ></i>
-          Mi Librero
+
+          Find<span className="text-info">It</span>
         </Link>
 
         <NetworkBadge />
