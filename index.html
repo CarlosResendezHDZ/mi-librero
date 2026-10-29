@@ -9,18 +9,18 @@
     />
     <meta
       name="description"
-      content="Registra los libros que lees por ISBN"
+      content="Encuentra y publica objetos perdidos o encontrados"
     />
     <meta name="theme-color" content="#5b3a29" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>Mi Librero</title>
+    <link rel="icon" type="image/png" href="/pwa-192x192.png" />
+    <title>FindIt</title>
 
     <style>
       /* CSS crítico del pre-shell */
       body {
         margin: 0;
         font-family: system-ui, sans-serif;
-        background: #f8f5f2;
+        background: #f6f8fc;
       }
 
       .pre {
@@ -49,7 +49,7 @@
         width: 40px;
         height: 40px;
         border-radius: 50%;
-        border: 4px solid #e5d9cf;
+        border: 4px solid #dce4f4;
         border-top-color: #5b3a29;
         animation: g 0.8s linear infinite;
       }
@@ -57,9 +57,17 @@
       .pre nav {
         height: 64px;
         background: #fff;
-        border-top: 1px solid #e5d9cf;
+        border-top: 1px solid #dce4f4;
       }
 
+      .pre-loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        color: #4169e1;
+        font-weight: 600;
+      }
       @keyframes g {
         to {
           transform: rotate(360deg);
@@ -72,15 +80,18 @@
     <div id="root">
       <!-- Pre-shell: React lo reemplaza al iniciar -->
       <div class="pre">
-        <header>Mi Librero</header>
+        <header>FindIt</header>
         <main>
+          <div class="pre-loading">
           <div class="giro"></div>
+            <p>Cargando FindIt...</p>
+          </div>
         </main>
         <nav></nav>
       </div>
     </div>
 
-    <noscript>Mi Librero necesita JavaScript.</noscript>
+    <noscript>FindIt necesita JavaScript.</noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
