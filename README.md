@@ -29,21 +29,26 @@ La aplicación permite consultar publicaciones, buscar objetos, aplicar filtros 
 
 Los datos de las publicaciones se guardan actualmente mediante localStorage en cada navegador. Todavía no existe una base de datos compartida ni autenticación real.
 
+
 ## Tabla de definición del App Shell
 
-| Área | Elemento de FindIt | Implementación | Sin conexión |
-|---|---|---|---|
-| Pre-shell | Pantalla inicial de carga | index.html | Puede mostrarse desde caché |
-| Encabezado | Marca FindIt y estado de conexión | Frame | Indica falta de conexión |
-| Navegación | Inicio, Buscar, Publicar, Guardados y Perfil | Frame | Permite acceder a vistas cargadas |
-| Contenido | Pantallas de publicaciones y búsqueda | React Router | Utiliza información local |
-| Estados vacíos | Mensajes cuando no hay publicaciones | Componentes de FindIt | Siguen disponibles |
-| Feedback global | Aviso de conexión | Frame | Muestra advertencia |
-| Almacenamiento | Publicaciones y favoritos | localStorage | Conserva los datos del navegador |
-| PWA | Manifiesto y Service Worker | vite-plugin-pwa | Carga recursos almacenados |
+| Área | Elemento de FindIt | Implementación | Sin conexión | Semana |
+|---|---|---|---|---|
+| Pre-shell | Pantalla inicial con logo FindIt y animación | index.html | Puede mostrarse desde caché | 1 |
+| Encabezado | Marca FindIt, título e indicador de conexión | Frame en FindItApp.jsx | Permanece visible e indica falta de conexión | 1 |
+| Navegación | Inicio, Buscar, Publicar, Guardados y Perfil | Frame / bottom-nav | Permite acceder a vistas disponibles | 1 |
+| Contenido (rutas) | Publicaciones, búsqueda, formularios y detalles | React Router / Routes | Muestra publicaciones guardadas localmente | 1 |
+| Indicador de red | Estados En línea y Sin conexión | Frame / online | Muestra el aviso de desconexión | 1 |
+| Estados de carga | Skeletons animados y carga de pantallas | ItemsSkeleton / Suspense | Conserva la información disponible | 1 |
+| Errores y 404 | Recuperación de errores y página no encontrada | ViewErrorBoundary.jsx / NoEncontrado.jsx | Evita que una falla deje la pantalla en blanco | 1 |
+| Feedback global | Alertas de API y notificaciones de acciones | api-alert / findit-toast | Muestra advertencias y confirmaciones locales | 1 |
+| Acción global | Acceso rápido para publicar objetos | Frame / Publicar.jsx | Permite crear publicaciones locales | 1 |
+
+
 
 ## Wireframe
 
+![Wireframe de FindIt](docs/wireframe-findit.png)
 El diseño principal de FindIt está organizado en tres áreas:
 
 **Encabezado:** marca FindIt, nombre de la sección y estado de conexión.
@@ -53,6 +58,7 @@ El diseño principal de FindIt está organizado en tres áreas:
 **Navegación inferior:** Inicio, Buscar, Publicar, Guardados y Perfil.
 
 El encabezado y la navegación se mantienen mientras cambia el contenido de las secciones.
+
 
 ## Pruebas realizadas
 
