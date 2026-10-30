@@ -5,6 +5,7 @@ export default function Publicar({ onPublish }) {
     const [form, setForm] = useState({ tipo: 'Perdido', nombre: '', categoria: '', descripcion: '', fecha: new Date().toISOString().slice(0, 10), lugar: '', imagen: '' });
 
   const [error, setError] = useState('');
+  const [guardando, setGuardando] = useState(false);
 
   function set(k, v) {
     setForm(f => ({ ...f, [k]: v }));
@@ -28,20 +29,37 @@ export default function Publicar({ onPublish }) {
     reader.readAsDataURL(file);
   }
 
-  function submit(e) {
-    e.preventDefault();
+ 
+async function submit(e) {
+  e.preventDefault();
 
-    if (!form.nombre.trim() || !form.categoria.trim() || !form.lugar.trim()) {
-      setError('Completa los campos obligatorios.');
-      return;
-    }
+  if (guardando) return;
 
-    try {
-      onPublish(form);
-    } catch {
-      setError('No se pudo guardar. Prueba con una imagen más pequeña.');
-    }
+  if (
+    !form.nombre.trim() ||
+    !form.categoria.trim() ||
+    !form.lugar.trim()
+  ) {
+    setError('Completa los campos obligatorios.');
+    return;
   }
+
+  setError('');
+  setGuardando(true);
+
+  try {
+    await onPublish(form);
+  } catch (error) {
+    console.error('Error al publicar:', error);
+
+    setError(
+      'No se pudo guardar en PocketBase. Verifica tu conexión e inténtalo nuevamente.'
+    );
+  } finally {
+    setGuardando(false);
+  }
+}
+
 
   return (
     <form className="panel publish-form" onSubmit={submit}>
@@ -117,12 +135,18 @@ export default function Publicar({ onPublish }) {
         />
       </label>
       {error && <p className="error-text">{error}</p>}
-      <button className="primary full" type="submit">
-        Publicar objeto
+      <button
+        className="primary full"
+        type="submit"
+        disabled={guardando}
+      >
+        {guardando ? 'Publicando...' : 'Publicar objeto'}
       </button>
       <p className="help">
-        Esta versión guarda la publicación en este navegador, no en una base de datos compartida.
-      </p>
+  Tu publicación se guardará en PocketBase y
+  estará disponible para otros usuarios.
+  Necesitas conexión para publicar.
+</p>
     </form>
   );
 }

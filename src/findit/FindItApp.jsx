@@ -2,50 +2,26 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';import { Ro
 
 import { Search, House, PlusCircle, Star, UserRound, ArrowLeft, MapPin, CalendarDays, Filter as FilterIcon, Trash2, Image as ImageIcon } from 'lucide-react';import './findit.css';
 import ViewErrorBoundary from './ViewErrorBoundary.jsx';
-import { obtenerPublicaciones } from '../services/pocketbase.js';
+import LoginPocketBase from './Login.jsx';
+import {
+  obtenerUsuarioActual,
+  cerrarSesion
+} from '../services/pocketbase.js';
+import {
+  obtenerPublicaciones,
+  escucharCambiosPublicaciones,
+  crearPublicacion,
+  eliminarPublicacion
+} from '../services/pocketbase.js';
+
 
 const NoEncontrado = lazy(() => import('./NoEncontrado.jsx'));
 const Perfil = lazy(() => import('./Perfil.jsx'));
 const Publicar = lazy(() => import('./Publicar.jsx'));
-const KEY = 'findit_items_v1';
+const KEY = 'findit_publicaciones_remotas_v2';
 const FAV = 'findit_favs_v1';
-const ACCOUNT = 'findit_user_v1';
 
-const demo = [
-  {
-    id: 'ejemplo-1',
-    nombre: 'Mochila negra',
-    tipo: 'Perdido',
-    categoria: 'Accesorios',
-    descripcion: 'Se perdió una mochila negra cerca de la biblioteca. Contiene cuadernos.',
-    fecha: '2026-10-20',
-    lugar: 'Biblioteca',
-    autor: 'Comunidad',
-    imagen: '',
-  },
-  {
-    id: 'ejemplo-2',
-    nombre: 'Llaves con llavero azul',
-    tipo: 'Encontrado',
-    categoria: 'Llaves',
-    descripcion: 'Encontré unas llaves con un llavero azul.',
-    fecha: '2026-10-21',
-    lugar: 'Entrada principal',
-    autor: 'Comunidad',
-    imagen: '',
-  },
-  {
-    id: 'ejemplo-3',
-    nombre: 'Audífonos blancos',
-    tipo: 'Perdido',
-    categoria: 'Electrónica',
-    descripcion: 'Busco audífonos inalámbricos blancos.',
-    fecha: '2026-10-19',
-    lugar: 'Cafetería',
-    autor: 'Comunidad',
-    imagen: '',
-  },
-];
+
 
 function stored(key, def) {
   try {
@@ -57,10 +33,19 @@ function stored(key, def) {
 }
 
 function App() {
-  const [items, setItems] = useState(() => stored(KEY, demo));
+  const [items, setItems] = useState(() => stored(KEY, []));
   const [favs, setFavs] = useState(() => stored(FAV, []));
-  const [user, setUser] = useState(() => stored(ACCOUNT, null));
-  const [online, setOnline] = useState(navigator.onLine);
+const [user, setUser] = useState(() => {
+  const actual = obtenerUsuarioActual();
+
+  return actual
+    ? {
+        id: actual.id,
+        name: actual.nombre || actual.email,
+        email: actual.email
+      }
+    : null;
+});  const [online, setOnline] = useState(navigator.onLine);
   const [search, setSearch] = useState('');
   const [type, setType] = useState('Todos');
   const [filters, setFilters] = useState({ categoria: '', lugar: '', fecha: '' });
@@ -86,22 +71,15 @@ useEffect(() => {
   obtenerPublicaciones()
     .then((remotas) => {
       if (!activo) return;
+      setItems(
+        remotas.map((item) => ({
+          ...item,
+          origen: 'pocketbase',
+        }))
+      );
 
-      setItems((actuales) => {
-        const locales = actuales.filter(
-          (item) =>
-            item.origen !== 'pocketbase' &&
-            !String(item.id).startsWith('ejemplo-')
-        );
+      setAvisoAPI('');
 
-        return [
-          ...remotas.map((item) => ({
-            ...item,
-            origen: 'pocketbase',
-          })),
-          ...locales,
-        ];
-      });
     })
     .catch((error) => {
       console.error('Error al consultar PocketBase:', error);
@@ -124,6 +102,83 @@ useEffect(() => {
 }, []);
 
 
+useEffect(() => {
+  let activo = true;
+  let cancelarSuscripcion;
+
+  const actualizarPublicaciones = async () => {
+    try {
+      const remotas = await obtenerPublicaciones();
+
+      if (!activo) return;
+
+      setItems(
+        remotas.map((item) => ({
+          ...item,
+          origen: 'pocketbase',
+        }))
+      );
+
+      setAvisoAPI('');
+    } catch (error) {
+      if (activo) {
+        console.warn(
+          'No se pudieron actualizar las publicaciones:',
+          error
+        );
+      }
+    }
+  };
+
+  escucharCambiosPublicaciones(actualizarPublicaciones)
+    .then((cancelar) => {
+      if (activo) {
+        cancelarSuscripcion = cancelar;
+      } else {
+        void cancelar();
+      }
+    })
+    .catch((error) => {
+      if (activo) {
+        console.warn('Realtime no disponible:', error);
+      }
+    });
+
+  const alRecuperarInternet = () => {
+    void actualizarPublicaciones();
+  };
+
+  const alVolverALaPestana = () => {
+    if (document.visibilityState === 'visible') {
+      void actualizarPublicaciones();
+    }
+  };
+
+  window.addEventListener('online', alRecuperarInternet);
+  document.addEventListener('visibilitychange', alVolverALaPestana);
+
+  // Respaldo si PocketBase se reinicia sin perder internet.
+  const intervalo = window.setInterval(() => {
+    if (navigator.onLine && document.visibilityState === 'visible') {
+      void actualizarPublicaciones();
+    }
+  }, 30000);
+
+  return () => {
+    activo = false;
+
+    window.removeEventListener('online', alRecuperarInternet);
+    document.removeEventListener('visibilitychange', alVolverALaPestana);
+
+    window.clearInterval(intervalo);
+
+    if (cancelarSuscripcion) {
+      void cancelarSuscripcion();
+    }
+  };
+}, []);
+
+
 
   useEffect(() => {
     localStorage.setItem(KEY, JSON.stringify(items));
@@ -133,13 +188,6 @@ useEffect(() => {
     localStorage.setItem(FAV, JSON.stringify(favs));
   }, [favs]);
 
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem(ACCOUNT, JSON.stringify(user));
-    } else {
-      localStorage.removeItem(ACCOUNT);
-    }
-  }, [user]);
 
   useEffect(() => {
     const yes = () => setOnline(true);
@@ -184,39 +232,63 @@ useEffect(() => {
   };
 
 
-  const login = name => {
-    setUser({ name: name.trim() || 'Invitado' });
+  const login = usuario => {
+    setUser(usuario);
     navigate('/inicio');
   };
 
 
-const publish = entry => {
-  const id = globalThis.crypto?.randomUUID?.() || String(Date.now());
 
-  setItems(old => [
-    {
-      ...entry,
-      id,
-      autor: user?.name || 'Invitado'
-    },
-    ...old
+const publish = async entry => {
+  const nueva = await crearPublicacion(entry);
+
+  const publicacion = {
+    id: nueva.id,
+    nombre: nueva.nombre,
+    tipo: nueva.tipo,
+    categoria: nueva.categoria,
+    descripcion: nueva.descripcion,
+    fecha: nueva.fecha?.slice(0, 10) || '',
+    lugar: nueva.lugar,
+    autor: nueva.autor,
+    usuario: nueva.usuario,
+    imagen: entry.imagen || '',
+    origen: 'pocketbase'
+  };
+
+  setItems(actuales => [
+    publicacion,
+    ...actuales.filter(item => item.id !== publicacion.id)
   ]);
 
-  setNotificacion('¡Tu publicación se guardó correctamente!');
+  setNotificacion('¡Publicación guardada en PocketBase!');
   navigate('/mis-publicaciones');
 };
 
 
 
-const remove = id => {
-  if (window.confirm('¿Eliminar esta publicación?')) {
-    setItems(old => old.filter(i => i.id !== id));
 
-    setFavs(old => old.filter(x => x !== id));
 
-    setNotificacion('Publicación eliminada correctamente.');
+const remove = async id => {
+  try {
+    await eliminarPublicacion(id);
+
+    setItems(actuales =>
+      actuales.filter(item => item.id !== id)
+    );
+
+    setNotificacion(
+      '¡Publicación eliminada correctamente!'
+    );
+  } catch (error) {
+    console.error('Error al eliminar:', error);
+
+    setNotificacion(
+      'No se pudo eliminar la publicación. Inténtalo nuevamente.'
+    );
   }
 };
+
 
 
   return (
@@ -260,8 +332,10 @@ const remove = id => {
           <Route
             path="/login"
             element={
-              <Login onLogin={login} user={user} />
-            }
+<LoginPocketBase
+  onAuthenticated={login}
+  user={user}
+/>            }
           />
           <Route
             path="/inicio"
@@ -471,6 +545,7 @@ const remove = id => {
                     user={user}
                     online={online}
                     onLogout={() => {
+                      cerrarSesion();
                       setUser(null);
                       navigate('/login');
                     }}
@@ -504,61 +579,6 @@ const remove = id => {
   );
 }
 
-function Login({ onLogin, user }) {
-  const [name, setName] = useState('');
-
-  return (
-    <div className="login-page">
-      <div className="login-card">
-        <div className="logo-big">
-          <Search size={42} />
-        </div>
-        <div className="brand">
-          Find
-          <span>
-            It
-          </span>
-        </div>
-        <h1>
-          Lo perdido puede volver.
-        </h1>
-        <p>
-          Conecta con tu comunidad para recuperar o devolver objetos.
-        </p>
-        <div className="login-art">
-          <span>
-            🔎
-          </span>
-          <span>
-            🎒
-          </span>
-          <span>
-            🔑
-          </span>
-        </div>
-        <form onSubmit={e => { e.preventDefault(); onLogin(name); }}>
-          <label>
-            Tu nombre
-            <input
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Escribe tu nombre"
-              required
-              minLength={2}
-            />
-          </label>
-          <button className="primary full">
-            Comenzar
-          </button>
-        </form>
-        {user && <Link to="/inicio" className="secondary full link-button">Volver al inicio</Link>}
-        <p className="disclaimer">
-          Acceso de demostración. Firebase Authentication se integrará en la siguiente etapa.
-        </p>
-      </div>
-    </div>
-  );
-}
 
 function Frame({ title, children, online, back = false }) {
   const navigate = useNavigate();
@@ -788,7 +808,7 @@ const setTab = (nuevoTab) => {
   )
 }
 
-  const shown = tab === 'mias' ? items.filter(x => user && x.autor === user.name) : items.filter(x => favs.includes(x.id));
+  const shown = tab === 'mias' ? items.filter(x => user && x.usuario === user.id) : items.filter(x => favs.includes(x.id));
 
   return (
     <>
