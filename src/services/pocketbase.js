@@ -5,6 +5,19 @@ const pb = new PocketBase(
   import.meta.env.VITE_POCKETBASE_URL
 )
 
+
+pb.beforeSend = (url, options) => {
+  if (url.includes('.ngrok-free.dev')) {
+    options.headers = {
+      ...options.headers,
+      'ngrok-skip-browser-warning': 'true'
+    };
+  }
+
+  return { url, options };
+};
+
+
 export async function obtenerPublicaciones() {
   const respuesta = await pb
     .collection('publicaciones')
