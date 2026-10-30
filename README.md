@@ -48,8 +48,7 @@ Los datos de las publicaciones se guardan actualmente mediante localStorage en c
 
 ## Wireframe
 
-![Wireframe del App Shell de FindIt](docs/wireframe-findit.png)
-
+![Wireframe de FindIt](docs/wireframe-findit.png)
 El diseño principal de FindIt está organizado en tres áreas:
 
 **Encabezado:** marca FindIt, nombre de la sección y estado de conexión.
