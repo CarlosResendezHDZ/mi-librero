@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "target": "findit",
     "public": "dist",
     "ignore": [
       "firebase.json",
