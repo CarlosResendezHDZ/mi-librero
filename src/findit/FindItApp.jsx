@@ -350,7 +350,7 @@ const remove = async id => {
                       Encuentra lo que importa.
                     </h1>
                     <p>
-                      Publica y descubre objetos perdidos o encontrados.
+                      Publica y descubre objetos perdidos o encontrados. Prueba PR 09/11/26
                     </p>
                   </div>
                   <span className="welcome-icon">

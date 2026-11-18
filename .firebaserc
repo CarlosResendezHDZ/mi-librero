@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "mi-librero-85180"
-  }
+  },
+  "targets": {
+    "mi-librero-85180": {
+      "hosting": {
+        "findit": [
+          "findit-85180"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
