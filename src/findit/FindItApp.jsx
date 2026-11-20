@@ -1,6 +1,6 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';import { Routes, Route, Link, useNavigate, useParams, useLocation, useSearchParams, Navigate } from 'react-router';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'; import { Routes, Route, Link, useNavigate, useParams, useLocation, useSearchParams, Navigate } from 'react-router';
 
-import { Search, House, PlusCircle, Star, UserRound, ArrowLeft, MapPin, CalendarDays, Filter as FilterIcon, Trash2, Image as ImageIcon } from 'lucide-react';import './findit.css';
+import { Search, House, PlusCircle, Star, UserRound, ArrowLeft, MapPin, CalendarDays, Filter as FilterIcon, Trash2, Image as ImageIcon } from 'lucide-react'; import './findit.css';
 import ViewErrorBoundary from './ViewErrorBoundary.jsx';
 import LoginPocketBase from './Login.jsx';
 import {
@@ -8,11 +8,21 @@ import {
   cerrarSesion
 } from '../services/pocketbase.js';
 import {
-  obtenerPublicaciones,
   escucharCambiosPublicaciones,
   crearPublicacion,
   eliminarPublicacion
 } from '../services/pocketbase.js';
+
+
+
+import {
+  usePublicacion,
+  useListaPublicaciones
+} from '../hooks/usePublicaciones.js';
+import { Cargando, ErrorCarga, Vacio } from '../components/Estados.jsx';
+import { listarPublicaciones } from '../repositories/publicacionesRepository.js';
+
+
 
 
 const NoEncontrado = lazy(() => import('./NoEncontrado.jsx'));
@@ -35,148 +45,144 @@ function stored(key, def) {
 function App() {
   const [items, setItems] = useState(() => stored(KEY, []));
   const [favs, setFavs] = useState(() => stored(FAV, []));
-const [user, setUser] = useState(() => {
-  const actual = obtenerUsuarioActual();
+  const [user, setUser] = useState(() => {
+    const actual = obtenerUsuarioActual();
 
-  return actual
-    ? {
+    return actual
+      ? {
         id: actual.id,
         name: actual.nombre || actual.email,
         email: actual.email
       }
-    : null;
-});  const [online, setOnline] = useState(navigator.onLine);
+      : null;
+  }); const [online, setOnline] = useState(navigator.onLine);
   const [search, setSearch] = useState('');
   const [type, setType] = useState('Todos');
   const [filters, setFilters] = useState({ categoria: '', lugar: '', fecha: '' });
   const [cargandoPublicaciones, setCargandoPublicaciones] = useState(true);
   const [avisoAPI, setAvisoAPI] = useState('');
+
+
   const [notificacion, setNotificacion] = useState('');
   const navigate = useNavigate();
 
-  useEffect(() => {
-  if (!notificacion) return;
 
-  const temporizador = setTimeout(() => {
-    setNotificacion('');
-  }, 3500);
-
-  return () => clearTimeout(temporizador);
-}, [notificacion]);
-  
-
-useEffect(() => {
-  let activo = true;
-
-  obtenerPublicaciones()
-    .then((remotas) => {
-      if (!activo) return;
+  const recibirConsultaInicial = useCallback(({ datos, error }) => {
+    if (datos) {
       setItems(
-        remotas.map((item) => ({
+        datos.map((item) => ({
           ...item,
           origen: 'pocketbase',
         }))
       );
 
       setAvisoAPI('');
-
-    })
-    .catch((error) => {
+    } else if (error) {
       console.error('Error al consultar PocketBase:', error);
 
-      if (activo) {
-        setAvisoAPI(
-          'No se pudo conectar con PocketBase. Se muestran los datos guardados.'
-        );
-      }
-    })   
-    .finally(() => {
-      if (activo) {
-        setCargandoPublicaciones(false);
-      }
-    });
-
-  return () => {
-    activo = false;
-  };
-}, []);
-
-
-useEffect(() => {
-  let activo = true;
-  let cancelarSuscripcion;
-
-  const actualizarPublicaciones = async () => {
-    try {
-      const remotas = await obtenerPublicaciones();
-
-      if (!activo) return;
-
-      setItems(
-        remotas.map((item) => ({
-          ...item,
-          origen: 'pocketbase',
-        }))
+      setAvisoAPI(
+        'No se pudo conectar con PocketBase. Se muestran los datos guardados.'
       );
+    }
 
-      setAvisoAPI('');
-    } catch (error) {
-      if (activo) {
-        console.warn(
-          'No se pudieron actualizar las publicaciones:',
-          error
+    setCargandoPublicaciones(false);
+  }, []);
+
+  useListaPublicaciones(recibirConsultaInicial);
+
+
+  useEffect(() => {
+    if (!notificacion) return;
+
+    const temporizador = setTimeout(() => {
+      setNotificacion('');
+    }, 3500);
+
+    return () => clearTimeout(temporizador);
+  }, [notificacion]);
+
+
+
+
+
+
+
+
+  useEffect(() => {
+    let activo = true;
+    let cancelarSuscripcion;
+
+    const actualizarPublicaciones = async () => {
+      try {
+        const remotas = await listarPublicaciones();
+
+        if (!activo) return;
+
+        setItems(
+          remotas.map((item) => ({
+            ...item,
+            origen: 'pocketbase',
+          }))
         );
-      }
-    }
-  };
 
-  escucharCambiosPublicaciones(actualizarPublicaciones)
-    .then((cancelar) => {
-      if (activo) {
-        cancelarSuscripcion = cancelar;
-      } else {
-        void cancelar();
+        setAvisoAPI('');
+      } catch (error) {
+        if (activo) {
+          console.warn(
+            'No se pudieron actualizar las publicaciones:',
+            error
+          );
+        }
       }
-    })
-    .catch((error) => {
-      if (activo) {
-        console.warn('Realtime no disponible:', error);
-      }
-    });
+    };
 
-  const alRecuperarInternet = () => {
-    void actualizarPublicaciones();
-  };
+    escucharCambiosPublicaciones(actualizarPublicaciones)
+      .then((cancelar) => {
+        if (activo) {
+          cancelarSuscripcion = cancelar;
+        } else {
+          void cancelar();
+        }
+      })
+      .catch((error) => {
+        if (activo) {
+          console.warn('Realtime no disponible:', error);
+        }
+      });
 
-  const alVolverALaPestana = () => {
-    if (document.visibilityState === 'visible') {
+    const alRecuperarInternet = () => {
       void actualizarPublicaciones();
-    }
-  };
+    };
 
-  window.addEventListener('online', alRecuperarInternet);
-  document.addEventListener('visibilitychange', alVolverALaPestana);
+    const alVolverALaPestana = () => {
+      if (document.visibilityState === 'visible') {
+        void actualizarPublicaciones();
+      }
+    };
 
-  // Respaldo si PocketBase se reinicia sin perder internet.
-  const intervalo = window.setInterval(() => {
-    if (navigator.onLine && document.visibilityState === 'visible') {
-      void actualizarPublicaciones();
-    }
-  }, 30000);
+    window.addEventListener('online', alRecuperarInternet);
+    document.addEventListener('visibilitychange', alVolverALaPestana);
 
-  return () => {
-    activo = false;
+    // Respaldo si PocketBase se reinicia sin perder internet.
+    const intervalo = window.setInterval(() => {
+      if (navigator.onLine && document.visibilityState === 'visible') {
+        void actualizarPublicaciones();
+      }
+    }, 30000);
 
-    window.removeEventListener('online', alRecuperarInternet);
-    document.removeEventListener('visibilitychange', alVolverALaPestana);
+    return () => {
+      activo = false;
 
-    window.clearInterval(intervalo);
+      window.removeEventListener('online', alRecuperarInternet);
+      document.removeEventListener('visibilitychange', alVolverALaPestana);
 
-    if (cancelarSuscripcion) {
-      void cancelarSuscripcion();
-    }
-  };
-}, []);
+      window.clearInterval(intervalo);
+
+      if (cancelarSuscripcion) {
+        void cancelarSuscripcion();
+      }
+    };
+  }, []);
 
 
 
@@ -214,7 +220,7 @@ useEffect(() => {
     [items, type, search, filters]
   );
 
-  
+
   const toggleFav = id => {
     const guardado = favs.includes(id);
 
@@ -239,75 +245,75 @@ useEffect(() => {
 
 
 
-const publish = async entry => {
-  const nueva = await crearPublicacion(entry);
+  const publish = async entry => {
+    const nueva = await crearPublicacion(entry);
 
-  const publicacion = {
-    id: nueva.id,
-    nombre: nueva.nombre,
-    tipo: nueva.tipo,
-    categoria: nueva.categoria,
-    descripcion: nueva.descripcion,
-    fecha: nueva.fecha?.slice(0, 10) || '',
-    lugar: nueva.lugar,
-    autor: nueva.autor,
-    usuario: nueva.usuario,
-    imagen: entry.imagen || '',
-    origen: 'pocketbase'
+    const publicacion = {
+      id: nueva.id,
+      nombre: nueva.nombre,
+      tipo: nueva.tipo,
+      categoria: nueva.categoria,
+      descripcion: nueva.descripcion,
+      fecha: nueva.fecha?.slice(0, 10) || '',
+      lugar: nueva.lugar,
+      autor: nueva.autor,
+      usuario: nueva.usuario,
+      imagen: entry.imagen || '',
+      origen: 'pocketbase'
+    };
+
+    setItems(actuales => [
+      publicacion,
+      ...actuales.filter(item => item.id !== publicacion.id)
+    ]);
+
+    setNotificacion('¡Publicación guardada en PocketBase!');
+    navigate('/mis-publicaciones');
   };
 
-  setItems(actuales => [
-    publicacion,
-    ...actuales.filter(item => item.id !== publicacion.id)
-  ]);
-
-  setNotificacion('¡Publicación guardada en PocketBase!');
-  navigate('/mis-publicaciones');
-};
 
 
 
 
+  const remove = async id => {
+    try {
+      await eliminarPublicacion(id);
 
-const remove = async id => {
-  try {
-    await eliminarPublicacion(id);
+      setItems(actuales =>
+        actuales.filter(item => item.id !== id)
+      );
 
-    setItems(actuales =>
-      actuales.filter(item => item.id !== id)
-    );
+      setNotificacion(
+        '¡Publicación eliminada correctamente!'
+      );
+    } catch (error) {
+      console.error('Error al eliminar:', error);
 
-    setNotificacion(
-      '¡Publicación eliminada correctamente!'
-    );
-  } catch (error) {
-    console.error('Error al eliminar:', error);
-
-    setNotificacion(
-      'No se pudo eliminar la publicación. Inténtalo nuevamente.'
-    );
-  }
-};
+      setNotificacion(
+        'No se pudo eliminar la publicación. Inténtalo nuevamente.'
+      );
+    }
+  };
 
 
 
   return (
     <>
       <div className="app">
-        
-      {notificacion && (
-        <div className="findit-toast" role="status">
-          <span>✓ {notificacion}</span>
 
-          <button
-            type="button"
-            onClick={() => setNotificacion('')}
-            aria-label="Cerrar notificación"
-          >
-            ×
-          </button>
-        </div>
-      )}
+        {notificacion && (
+          <div className="findit-toast" role="status">
+            <span>✓ {notificacion}</span>
+
+            <button
+              type="button"
+              onClick={() => setNotificacion('')}
+              aria-label="Cerrar notificación"
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         {avisoAPI && (
           <div className="api-alert" role="alert">
@@ -332,10 +338,10 @@ const remove = async id => {
           <Route
             path="/login"
             element={
-<LoginPocketBase
-  onAuthenticated={login}
-  user={user}
-/>            }
+              <LoginPocketBase
+                onAuthenticated={login}
+                user={user}
+              />}
           />
           <Route
             path="/inicio"
@@ -373,16 +379,16 @@ const remove = async id => {
                   title="Publicaciones recientes"
                   subtitle={`${visible.length} resultados`}
                 />
-                
-                  {cargandoPublicaciones ? (
-                    <ItemsSkeleton />
-                  ) : (
-                    <Items
-                      items={visible}
-                      favs={favs}
-                      toggleFav={toggleFav}
-                    />
-                  )}
+
+                {cargandoPublicaciones ? (
+                  <ItemsSkeleton />
+                ) : (
+                  <Items
+                    items={visible}
+                    favs={favs}
+                    toggleFav={toggleFav}
+                  />
+                )}
 
               </Frame>
             }
@@ -404,15 +410,15 @@ const remove = async id => {
                   subtitle={`${visible.length} encontrados`}
                 />
 
-{cargandoPublicaciones ? (
-  <ItemsSkeleton />
-) : (
-  <Items
-    items={visible}
-    favs={favs}
-    toggleFav={toggleFav}
-  />
-)}
+                {cargandoPublicaciones ? (
+                  <ItemsSkeleton />
+                ) : (
+                  <Items
+                    items={visible}
+                    favs={favs}
+                    toggleFav={toggleFav}
+                  />
+                )}
               </Frame>
             }
           />
@@ -464,7 +470,7 @@ const remove = async id => {
               </Frame>
             }
           />
-          
+
           <Route
             path="/publicar"
             element={
@@ -486,44 +492,44 @@ const remove = async id => {
                       </div>
                     }
                   >
-          <Publicar onPublish={publish} />
-        </Suspense>
-      ) : (
-        <RequireLogin />
-      )}
-    </Frame>
-  }
-/>
+                    <Publicar onPublish={publish} />
+                  </Suspense>
+                ) : (
+                  <RequireLogin />
+                )}
+              </Frame>
+            }
+          />
 
-<Route
-  path="/objeto/:id"
-  element={
-    <Frame title="Detalle del objeto" online={online} back>
-      <Detail
-        items={items}
-        favs={favs}
-        toggleFav={toggleFav}
-      />
-    </Frame>
-  }
-/>
+          <Route
+            path="/objeto/:id"
+            element={
+              <Frame title="Detalle del objeto" online={online} back>
+                <Detail
+                  items={items}
+                  favs={favs}
+                  toggleFav={toggleFav}
+                />
+              </Frame>
+            }
+          />
 
-<Route
-  path="/mis-publicaciones"
-  element={
-    <Frame title="Mis publicaciones" online={online} back>
-      <MyPosts
-        items={items}
-        user={user}
-        favs={favs}
-        toggleFav={toggleFav}
-        remove={remove}
-      />
-    </Frame>
-  }
-/>
+          <Route
+            path="/mis-publicaciones"
+            element={
+              <Frame title="Mis publicaciones" online={online} back>
+                <MyPosts
+                  items={items}
+                  user={user}
+                  favs={favs}
+                  toggleFav={toggleFav}
+                  remove={remove}
+                />
+              </Frame>
+            }
+          />
 
-          
+
           <Route
             path="/perfil"
             element={
@@ -555,7 +561,7 @@ const remove = async id => {
             }
           />
 
-          
+
           <Route
             path="*"
             element={
@@ -682,7 +688,7 @@ function ItemsSkeleton() {
 
 function Items({ items, favs, toggleFav }) {
 
-  
+
 
 
   return items.length ? <div className="item-grid">{items.map(item => <ItemCard key={item.id} item={item} liked={favs.includes(item.id)} toggleFav={toggleFav} />)}</div> : <div className="empty"><Search size={35} /><h3>No encontramos publicaciones</h3><p>Prueba otros términos o cambia los filtros.</p></div>;
@@ -725,67 +731,107 @@ function ItemCard({ item, liked, toggleFav }) {
 
 
 
+
 function Detail({ items, favs, toggleFav }) {
   const { id } = useParams();
 
-  const i = items.find(x => x.id === id);
+  // Consulta el detalle directamente desde PocketBase.
+  const {
+    datos,
+    cargando,
+    error,
+    reintentar,
+  } = usePublicacion(id);
 
-  if (!i)
+  // Conservamos la publicación local como respaldo.
+  const guardado = items.find((x) => x.id === id);
+
+  // Si la API devuelve 404, tratamos el objeto como inexistente.
+  const i = datos === null ? null : (datos ?? guardado);
+
+  if (cargando && !guardado) {
     return (
       <div className="empty">
-        No encontramos ese objeto.
+        <Cargando />
       </div>
     );
+  }
+
+  if (error && !guardado) {
+    return (
+      <div className="empty">
+        <ErrorCarga
+          mensaje={error.message}
+          onReintentar={reintentar}
+        />
+      </div>
+    );
+  }
+
+  if (!i) {
+    return (
+      <div className="empty">
+        <Vacio texto="No encontramos ese objeto." />
+      </div>
+    );
+  }
 
   return (
     <article className="detail">
       <div className="detail-photo">
-        {i.imagen ? <img src={i.imagen} alt={i.nombre} /> : <ImageIcon size={75} />}
+        {i.imagen ? (
+          <img src={i.imagen} alt={i.nombre} />
+        ) : (
+          <ImageIcon size={75} />
+        )}
       </div>
+
       <div className="detail-head">
         <div>
           <span className={'tag ' + (i.tipo === 'Perdido' ? 'lost' : 'found')}>
             {i.tipo}
           </span>
-          <h1>
-            {i.nombre}
-          </h1>
+          <h1>{i.nombre}</h1>
         </div>
+
         <button
           className={'heart ' + (favs.includes(i.id) ? 'liked' : '')}
           onClick={() => toggleFav(i.id)}
           aria-label="Favorito"
         >
-          <Star size={26} fill={favs.includes(i.id) ? 'currentColor' : 'none'} />
+          <Star
+            size={26}
+            fill={favs.includes(i.id) ? 'currentColor' : 'none'}
+          />
         </button>
       </div>
+
       <p className="detail-meta">
         <MapPin size={18} />
         {i.lugar}
       </p>
+
       <p className="detail-meta">
         <CalendarDays size={18} />
         {i.fecha}
       </p>
+
       <div className="panel">
-        <h2>
-          Descripción
-        </h2>
+        <h2>Descripción</h2>
+
         <p>
           {i.descripcion || 'Sin descripción adicional.'}
         </p>
+
         <div className="detail-tags">
-          <span>
-            {i.categoria}
-          </span>
-          <span>
-            {i.tipo}
-          </span>
+          <span>{i.categoria}</span>
+          <span>{i.tipo}</span>
         </div>
+
         <hr />
-        <h3>
-          Publicado por
-        </h3>
+
+        <h3>Publicado por</h3>
+
         <div className="author">
           <UserRound />
           {i.autor}
@@ -795,18 +841,19 @@ function Detail({ items, favs, toggleFav }) {
   );
 }
 
+
 function MyPosts({ items, user, favs, toggleFav, remove }) {
-const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
 
-const tab = searchParams.get('tab') === 'favoritos'
-  ? 'favoritos'
-  : 'mias'
+  const tab = searchParams.get('tab') === 'favoritos'
+    ? 'favoritos'
+    : 'mias'
 
-const setTab = (nuevoTab) => {
-  setSearchParams(
-    nuevoTab === 'favoritos' ? { tab: 'favoritos' } : {}
-  )
-}
+  const setTab = (nuevoTab) => {
+    setSearchParams(
+      nuevoTab === 'favoritos' ? { tab: 'favoritos' } : {}
+    )
+  }
 
   const shown = tab === 'mias' ? items.filter(x => user && x.usuario === user.id) : items.filter(x => favs.includes(x.id));
 
