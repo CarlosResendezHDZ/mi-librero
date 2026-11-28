@@ -4,6 +4,9 @@ import { Search, House, PlusCircle, Star, UserRound, ArrowLeft, MapPin, Calendar
 import ViewErrorBoundary from './ViewErrorBoundary.jsx';
 import LoginPocketBase from './Login.jsx';
 import {
+  cerrarSesionFirebase,
+  observarSesion
+} from '../services/firebaseAuth.js'; import {
   obtenerUsuarioActual,
   cerrarSesion
 } from '../services/pocketbase.js';
@@ -65,6 +68,35 @@ function App() {
 
   const [notificacion, setNotificacion] = useState('');
   const navigate = useNavigate();
+
+
+  useEffect(() => {
+    const detenerObservador = observarSesion(usuarioFirebase => {
+      if (usuarioFirebase) {
+        setUser({
+          id: usuarioFirebase.uid,
+          name: usuarioFirebase.displayName ||
+            (usuarioFirebase.isAnonymous
+              ? 'Invitado'
+              : usuarioFirebase.email || 'Usuario'),
+          email: usuarioFirebase.email || '',
+          authProvider: 'firebase'
+        });
+      } else {
+        const usuarioPocketBase = obtenerUsuarioActual();
+
+        setUser(usuarioPocketBase ? {
+          id: usuarioPocketBase.id,
+          name: usuarioPocketBase.nombre || usuarioPocketBase.email,
+          email: usuarioPocketBase.email,
+          authProvider: 'pocketbase'
+        } : null);
+      }
+    });
+
+    return () => detenerObservador();
+  }, []);
+
 
 
   const recibirConsultaInicial = useCallback(({ datos, error }) => {
@@ -550,7 +582,10 @@ function App() {
                   <Perfil
                     user={user}
                     online={online}
-                    onLogout={() => {
+                    onLogout={async () => {
+                      await cerrarSesionFirebase().catch(error => {
+                        console.warn('No se pudo cerrar la sesión Firebase:', error);
+                      });
                       cerrarSesion();
                       setUser(null);
                       navigate('/login');
