@@ -3,6 +3,10 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { Search } from 'lucide-react';
 import {
+  entrarConGoogle,
+  entrarComoInvitado
+} from '../services/firebaseAuth.js';
+import {
   registrarUsuario,
   iniciarSesion
 } from '../services/pocketbase.js';
@@ -40,6 +44,35 @@ export default function Login({ onAuthenticated, user }) {
           ? 'No se pudo crear la cuenta. Revisa los datos e intenta nuevamente.'
           : 'No se pudo iniciar sesión. Comprueba tu correo y contraseña.'
       );
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  async function accesoFirebase(metodo) {
+    setError('');
+    setCargando(true);
+
+    try {
+      const resultado = metodo === 'google'
+        ? await entrarConGoogle()
+        : await entrarComoInvitado();
+
+      const usuario = resultado.user;
+
+      onAuthenticated({
+        id: usuario.uid,
+        name: usuario.displayName ||
+          (metodo === 'invitado' ? 'Invitado' : usuario.email),
+        email: usuario.email || '',
+        authProvider: 'firebase'
+      });
+    } catch (err) {
+      console.error('Error con Firebase:', err);
+
+      if (err.code !== 'auth/popup-closed-by-user') {
+        setError('No se pudo iniciar sesión con Firebase.');
+      }
     } finally {
       setCargando(false);
     }
@@ -139,6 +172,32 @@ export default function Login({ onAuthenticated, user }) {
           </button>
 
         </form>
+        {!registro && (
+          <>
+            <p style={{ textAlign: 'center', margin: '16px 0' }}>
+              O continúa con
+            </p>
+
+            <button
+              type="button"
+              className="secondary full"
+              onClick={() => accesoFirebase('google')}
+              disabled={cargando}
+            >
+              🌐 Continuar con Google
+            </button>
+
+            <button
+              type="button"
+              className="secondary full"
+              onClick={() => accesoFirebase('invitado')}
+              disabled={cargando}
+            >
+              Entrar como invitado
+            </button>
+          </>
+        )}
+
 
         <button
           type="button"

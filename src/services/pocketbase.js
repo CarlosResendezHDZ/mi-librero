@@ -1,30 +1,56 @@
 
-import PocketBase from 'pocketbase'
+import PocketBase from 'pocketbase';
+import { EventSourcePolyfill } from 'event-source-polyfill';
 
-const pb = new PocketBase(
-  import.meta.env.VITE_POCKETBASE_URL
-)
+// URL de PocketBase configurada en las variables de entorno.
+const pocketbaseURL = import.meta.env.VITE_POCKETBASE_URL;
 
+// Detectar si estamos utilizando un tunel de ngrok.
+const usaNgrok = pocketbaseURL?.includes('.ngrok-free.dev');
 
+// Configurar EventSource con encabezados personalizados para ngrok.
+// Esto permite omitir la advertencia de ngrok en las conexiones Realtime.
+if (typeof window !== 'undefined' && usaNgrok) {
+  class NgrokEventSource extends EventSourcePolyfill {
+    constructor(url, options = {}) {
+      super(url, {
+        ...options,
+        headers: {
+          ...options.headers,
+          'ngrok-skip-browser-warning': 'true',
+        },
+      });
+    }
+  }
+
+  window.EventSource = NgrokEventSource;
+}
+
+// Crear la conexion con PocketBase.
+const pb = new PocketBase(pocketbaseURL);
+
+// Agregar el encabezado necesario para las solicitudes HTTP de ngrok.
 pb.beforeSend = (url, options) => {
   if (url.includes('.ngrok-free.dev')) {
     options.headers = {
       ...options.headers,
-      'ngrok-skip-browser-warning': 'true'
+      'ngrok-skip-browser-warning': 'true',
     };
   }
 
   return { url, options };
 };
 
+// ======================================================
+// OBTENER PUBLICACIONES
+// ======================================================
 
 export async function obtenerPublicaciones() {
   const respuesta = await pb
     .collection('publicaciones')
     .getList(1, 30, {
-      sort: '-created'
-    })
-    
+      sort: '-created',
+    });
 
   return respuesta.items.map((registro) => ({
     id: registro.id,
@@ -38,16 +64,23 @@ export async function obtenerPublicaciones() {
     usuario: registro.usuario,
     imagen: registro.imagen
       ? pb.files.getURL(registro, registro.imagen)
-      : ''
-  }))
+      : '',
+  }));
 }
 
+// ======================================================
+// ESCUCHAR CAMBIOS EN TIEMPO REAL
+// ======================================================
 
 export function escucharCambiosPublicaciones(alCambiar) {
   return pb.collection('publicaciones').subscribe('*', () => {
     alCambiar();
   });
 }
+
+// ======================================================
+// REGISTRAR USUARIO
+// ======================================================
 
 export async function registrarUsuario(nombre, email, password) {
   const correo = email.trim().toLowerCase();
@@ -66,6 +99,10 @@ export async function registrarUsuario(nombre, email, password) {
   return sesion.record;
 }
 
+// ======================================================
+// INICIAR SESION
+// ======================================================
+
 export async function iniciarSesion(email, password) {
   const sesion = await pb
     .collection('usuarios')
@@ -77,9 +114,17 @@ export async function iniciarSesion(email, password) {
   return sesion.record;
 }
 
+// ======================================================
+// CERRAR SESION
+// ======================================================
+
 export function cerrarSesion() {
   pb.authStore.clear();
 }
+
+// ======================================================
+// OBTENER USUARIO ACTUAL
+// ======================================================
 
 export function obtenerUsuarioActual() {
   if (!pb.authStore.isValid) return null;
@@ -91,6 +136,9 @@ export function obtenerUsuarioActual() {
     : null;
 }
 
+// ======================================================
+// CREAR PUBLICACION
+// ======================================================
 
 export async function crearPublicacion(datosFormulario) {
   const usuario = obtenerUsuarioActual();
@@ -109,6 +157,18 @@ export async function crearPublicacion(datosFormulario) {
     autor: usuario.nombre || usuario.email,
     usuario: usuario.id,
   };
+
+
+  // ID fijo para publicaciones sincronizadas desde IndexedDB.
+  // Evita generar uno diferente en cada reintento.
+  if (datosFormulario.idRemoto) {
+    if (!/^[a-z0-9]{15}$/.test(datosFormulario.idRemoto)) {
+      throw new Error('ID remoto inválido para PocketBase.');
+    }
+
+    datos.id = datosFormulario.idRemoto;
+  }
+
 
   // Convertir la imagen del formulario en un archivo real.
   if (datosFormulario.imagen) {
@@ -138,6 +198,9 @@ export async function crearPublicacion(datosFormulario) {
   return await pb.collection('publicaciones').create(datos);
 }
 
+// ======================================================
+// ELIMINAR PUBLICACION
+// ======================================================
 
 export async function eliminarPublicacion(id) {
   const usuario = obtenerUsuarioActual();
@@ -151,4 +214,21 @@ export async function eliminarPublicacion(id) {
   }
 
   await pb.collection('publicaciones').delete(id);
+}
+
+
+/**
+ * Comprueba si una publicación ya existe en PocketBase.
+ * Se utiliza para evitar duplicados al sincronizar IndexedDB.
+ */
+export async function buscarPublicacionRemota(id) {
+  try {
+    return await pb.collection('publicaciones').getOne(id);
+  } catch (error) {
+    if (error.status === 404) {
+      return null;
+    }
+
+    throw error;
+  }
 }

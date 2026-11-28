@@ -4,6 +4,9 @@ import { Search, House, PlusCircle, Star, UserRound, ArrowLeft, MapPin, Calendar
 import ViewErrorBoundary from './ViewErrorBoundary.jsx';
 import LoginPocketBase from './Login.jsx';
 import {
+  cerrarSesionFirebase,
+  observarSesion
+} from '../services/firebaseAuth.js'; import {
   obtenerUsuarioActual,
   cerrarSesion
 } from '../services/pocketbase.js';
@@ -21,6 +24,12 @@ import {
 } from '../hooks/usePublicaciones.js';
 import { Cargando, ErrorCarga, Vacio } from '../components/Estados.jsx';
 import { listarPublicaciones } from '../repositories/publicacionesRepository.js';
+import {
+  guardarPublicacionPendiente,
+  obtenerPublicacionesPendientes
+} from '../db/local.js';
+import { iniciarSincronizacionPendientes } from '../services/sincronizarPendientes.js';
+import ImagenPublicacion from './ImagenPublicacion.jsx';
 
 
 
@@ -67,14 +76,135 @@ function App() {
   const navigate = useNavigate();
 
 
+  // Recuperar publicaciones pendientes desde IndexedDB.
+  useEffect(() => {
+    let activo = true;
+
+    const recuperarPendientes = async () => {
+      try {
+        const pendientes = await obtenerPublicacionesPendientes();
+
+        if (!activo) return;
+
+        setItems(actuales => {
+          const ids = new Set(pendientes.map(p => p.id));
+
+          return [
+            ...pendientes,
+            ...actuales.filter(item =>
+              item.estadoSync !== 'pendiente' &&
+              !ids.has(item.id)
+            )
+          ];
+        });
+
+        console.log(
+          'FindIt: publicaciones pendientes recuperadas:',
+          pendientes.length
+        );
+      } catch (error) {
+        console.error('Error al recuperar pendientes:', error);
+      }
+    };
+
+    void recuperarPendientes();
+
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+
+
+  // Escuchar publicaciones sincronizadas con PocketBase.
+  useEffect(() => {
+    const alSincronizar = (evento) => {
+      const { localId, remota } = evento.detail;
+
+      setItems(actuales =>
+        actuales.map(item =>
+          item.id === localId
+            ? {
+              ...item,
+              id: remota.id,
+              nombre: remota.nombre,
+              tipo: remota.tipo,
+              categoria: remota.categoria,
+              descripcion: remota.descripcion,
+              fecha: remota.fecha?.slice(0, 10) || '',
+              lugar: remota.lugar,
+              autor: remota.autor,
+              usuario: remota.usuario,
+              origen: 'pocketbase',
+              estadoSync: 'sincronizado'
+            }
+            : item
+        )
+      );
+
+      setNotificacion(
+        '¡Publicación sincronizada correctamente con PocketBase!'
+      );
+    };
+
+    window.addEventListener(
+      'findit:publicacion-sincronizada',
+      alSincronizar
+    );
+
+    const detener = iniciarSincronizacionPendientes();
+
+    return () => {
+      detener();
+      window.removeEventListener(
+        'findit:publicacion-sincronizada',
+        alSincronizar
+      );
+    };
+  }, []);
+
+
+
+  useEffect(() => {
+    const detenerObservador = observarSesion(usuarioFirebase => {
+      if (usuarioFirebase) {
+        setUser({
+          id: usuarioFirebase.uid,
+          name: usuarioFirebase.displayName ||
+            (usuarioFirebase.isAnonymous
+              ? 'Invitado'
+              : usuarioFirebase.email || 'Usuario'),
+          email: usuarioFirebase.email || '',
+          authProvider: 'firebase'
+        });
+      } else {
+        const usuarioPocketBase = obtenerUsuarioActual();
+
+        setUser(usuarioPocketBase ? {
+          id: usuarioPocketBase.id,
+          name: usuarioPocketBase.nombre || usuarioPocketBase.email,
+          email: usuarioPocketBase.email,
+          authProvider: 'pocketbase'
+        } : null);
+      }
+    });
+
+    return () => detenerObservador();
+  }, []);
+
+
+
   const recibirConsultaInicial = useCallback(({ datos, error }) => {
     if (datos) {
-      setItems(
-        datos.map((item) => ({
+
+      setItems(actuales => [
+        ...actuales.filter(item => item.estadoSync === 'pendiente'),
+        ...datos.map(item => ({
           ...item,
           origen: 'pocketbase',
         }))
-      );
+      ]);
+
 
       setAvisoAPI('');
     } else if (error) {
@@ -118,12 +248,15 @@ function App() {
 
         if (!activo) return;
 
-        setItems(
-          remotas.map((item) => ({
+
+        setItems(actuales => [
+          ...actuales.filter(item => item.estadoSync === 'pendiente'),
+          ...remotas.map(item => ({
             ...item,
             origen: 'pocketbase',
           }))
-        );
+        ]);
+
 
         setAvisoAPI('');
       } catch (error) {
@@ -246,6 +379,28 @@ function App() {
 
 
   const publish = async entry => {
+
+    // Sin Internet: guardar la publicación en IndexedDB.
+    if (!navigator.onLine) {
+      const pendiente = await guardarPublicacionPendiente({
+        ...entry,
+        usuario: user?.id || '',
+        autor: user?.name || user?.email || 'Invitado'
+      });
+
+      setItems(actuales => [
+        pendiente,
+        ...actuales
+      ]);
+
+      setNotificacion(
+        'Publicación guardada sin Internet. Pendiente de sincronización.'
+      );
+
+      navigate('/mis-publicaciones');
+      return;
+    }
+
     const nueva = await crearPublicacion(entry);
 
     const publicacion = {
@@ -550,7 +705,10 @@ function App() {
                   <Perfil
                     user={user}
                     online={online}
-                    onLogout={() => {
+                    onLogout={async () => {
+                      await cerrarSesionFirebase().catch(error => {
+                        console.warn('No se pudo cerrar la sesión Firebase:', error);
+                      });
                       cerrarSesion();
                       setUser(null);
                       navigate('/login');
@@ -698,7 +856,13 @@ function ItemCard({ item, liked, toggleFav }) {
   return (
     <article className="item-card">
       <Link to={`/objeto/${item.id}`} className="thumb">
-        {item.imagen ? <img src={item.imagen} alt={item.nombre} /> : <ImageIcon size={45} />}
+
+        <ImagenPublicacion
+          src={item.imagen}
+          alt={item.nombre}
+          fallback={<ImageIcon size={45} />}
+        />
+
       </Link>
       <div className="item-info">
         <div className="item-top">
@@ -716,6 +880,16 @@ function ItemCard({ item, liked, toggleFav }) {
         <Link to={`/objeto/${item.id}`} className="item-title">
           {item.nombre}
         </Link>
+
+        {item.estadoSync === 'pendiente' && (
+          <div className="sync-pending" role="status">
+            <strong> Pendiente de sincronización</strong>
+            <span>
+              Se publicará automáticamente cuando vuelva Internet.
+            </span>
+          </div>
+        )}
+
         <p>
           <MapPin size={14} />
           {item.lugar}
@@ -780,7 +954,13 @@ function Detail({ items, favs, toggleFav }) {
     <article className="detail">
       <div className="detail-photo">
         {i.imagen ? (
-          <img src={i.imagen} alt={i.nombre} />
+
+          <ImagenPublicacion
+            src={i.imagen}
+            alt={i.nombre}
+            fallback={<ImageIcon size={60} />}
+          />
+
         ) : (
           <ImageIcon size={75} />
         )}
@@ -818,6 +998,17 @@ function Detail({ items, favs, toggleFav }) {
 
       <div className="panel">
         <h2>Descripción</h2>
+
+        {i.estadoSync === 'pendiente' && (
+          <div className="sync-pending" role="status">
+            <strong>Pendiente de sincronización</strong>
+            <span>
+              Esta publicación está guardada en tu dispositivo.
+              Se publicará automáticamente cuando vuelva Internet.
+            </span>
+          </div>
+        )}
+
 
         <p>
           {i.descripcion || 'Sin descripción adicional.'}
