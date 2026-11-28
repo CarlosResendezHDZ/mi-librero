@@ -86,18 +86,40 @@ export async function listarPublicaciones({ signal } = {}) {
 /**
  * Consulta una publicación por su ID.
  */
+
 export async function obtenerPublicacion(id, { signal } = {}) {
   if (!id) return null;
 
   try {
     const url = `${API.base}${API.detalle(id)}`;
-
     const registro = await getJSON(url, { signal });
+    const publicacion = aPublicacion(registro);
 
-    return aPublicacion(registro);
+    // Guardar también la publicación consultada individualmente.
+    try {
+      const db = await dbLocal;
+      await db.put('publicaciones', publicacion);
+    } catch (error) {
+      console.warn('No se pudo guardar el detalle en IndexedDB:', error);
+    }
+
+    return publicacion;
   } catch (error) {
+    if (signal?.aborted || error?.name === 'AbortError') {
+      throw error;
+    }
+
     if (error instanceof ErrorHttp && error.status === 404) {
       return null;
+    }
+
+    // Sin conexión: recuperar el objeto guardado.
+    const db = await dbLocal;
+    const guardada = await db.get('publicaciones', id);
+
+    if (guardada) {
+      console.info('FindIt: detalle recuperado de IndexedDB');
+      return guardada;
     }
 
     throw error;
