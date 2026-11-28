@@ -42,9 +42,34 @@ export default defineConfig({
         ]
       },
 
+
       workbox: {
-        navigateFallback: '/index.html'
+        navigateFallback: '/index.html',
+        runtimeCaching: [
+          {
+            urlPattern: ({ url, request }) =>
+              request.destination === 'image' &&
+              url.hostname.endsWith('.ngrok-free.dev') &&
+              url.pathname.startsWith('/api/files/'),
+
+            handler: 'CacheFirst',
+
+            options: {
+              cacheName: 'findit-pocketbase-imagenes',
+
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 30
+              },
+
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          }
+        ]
       }
+
     })
   ],
 
