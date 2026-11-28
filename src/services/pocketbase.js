@@ -158,6 +158,18 @@ export async function crearPublicacion(datosFormulario) {
     usuario: usuario.id,
   };
 
+
+  // ID fijo para publicaciones sincronizadas desde IndexedDB.
+  // Evita generar uno diferente en cada reintento.
+  if (datosFormulario.idRemoto) {
+    if (!/^[a-z0-9]{15}$/.test(datosFormulario.idRemoto)) {
+      throw new Error('ID remoto inválido para PocketBase.');
+    }
+
+    datos.id = datosFormulario.idRemoto;
+  }
+
+
   // Convertir la imagen del formulario en un archivo real.
   if (datosFormulario.imagen) {
     const respuesta = await fetch(datosFormulario.imagen);
@@ -202,4 +214,21 @@ export async function eliminarPublicacion(id) {
   }
 
   await pb.collection('publicaciones').delete(id);
+}
+
+
+/**
+ * Comprueba si una publicación ya existe en PocketBase.
+ * Se utiliza para evitar duplicados al sincronizar IndexedDB.
+ */
+export async function buscarPublicacionRemota(id) {
+  try {
+    return await pb.collection('publicaciones').getOne(id);
+  } catch (error) {
+    if (error.status === 404) {
+      return null;
+    }
+
+    throw error;
+  }
 }
